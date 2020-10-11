@@ -1,36 +1,84 @@
-## Stirling 数（子集划分）
+## 第一类斯特林数（Stirling Number）
 
-根据例题来讲解：  
-（2007 普及）将$n$个数$（1，2，…，n）$分成$r$个部分。每个部分至少一个数。将不同划分方法的总数记为$S_n^r$。例如，$S_4^2=7$，这 7 种不同的划分方法依次为 $\{\ (1) , (234) \}\,\{\ (2) ,  (134) \}\,\{\ (3) , (124) \}\,\{\ (4) , (123) \}\,\{\ (12) , (34) \}\,\{\ (13) , (24) \}\,\{\ (14) , (23) \}$。当$n=6，r=3$时，$S_6^3$=（    ）  
+ **第一类斯特林数** （斯特林轮换数） $\begin{bmatrix}n\\ k\end{bmatrix}$ 表示将 $n$ 个两两不同的元素，划分为 $k$ 个非空圆排列的方案数。
 
-> 提示：先固定一个数，对于其余的 5 个数考虑$S_5^3$与$S_5^2$，再分这两种情况对原固定的数进行分析。
-
-题解：在近几年算法竞赛中，递推算法越来越重要：
+### 递推式
 
 $$
-S_6^3=3 \times S_5^3 + S_5^2
+\begin{bmatrix}n\\ k\end{bmatrix}=\begin{bmatrix}n-1\\ k-1\end{bmatrix}+(n-1)\begin{bmatrix}n-1\\ k\end{bmatrix}
 $$
 
-$$
-S_5^3=3 \times S_4^3 + S_4^2
-$$
+边界是 $\begin{bmatrix}n\\ 0\end{bmatrix}=[n=0]$ 。
+
+该递推式的证明可以考虑其组合意义。
+
+我们插入一个新元素时，有两种方案：
+
+- 将该新元素置于一个单独的圆排列中，共有 $\begin{bmatrix}n-1\\ k-1\end{bmatrix}$ 种方案；
+- 将该元素插入到任何一个现有的圆排列中，共有 $(n-1)\begin{bmatrix}n-1\\ k\end{bmatrix}$ 种方案。
+
+根据加法原理，将两式相加即可得到递推式。
+
+## 第二类斯特林数（Stirling Number）
+
+ **第二类斯特林数** （斯特林子集数） $\begin{Bmatrix}n\\ k\end{Bmatrix}$ 表示将 $n$ 个两两不同的元素，划分为 $k$ 个非空子集的方案数。
+
+### 递推式
 
 $$
-S_5^2=2 \times S_4^2 + S_4^1
+\begin{Bmatrix}n\\ k\end{Bmatrix}=\begin{Bmatrix}n-1\\ k-1\end{Bmatrix}+k\begin{Bmatrix}n-1\\ k\end{Bmatrix}
 $$
 
-第二类 stirling 数，显然拥有这样的性质：
+边界是 $\begin{Bmatrix}n\\ 0\end{Bmatrix}=[n=0]$ 。
+
+还是考虑组合意义来证明。
+
+我们插入一个新元素时，有两种方案：
+
+- 将新元素单独放入一个子集，有 $\begin{Bmatrix}n-1\\ k-1\end{Bmatrix}$ 种方案；
+- 将新元素放入一个现有的非空子集，有 $k\begin{Bmatrix}n-1\\ k\end{Bmatrix}$ 种方案。
+
+根据加法原理，将两式相加即可得到递推式。
+
+## 应用
+
+### 上升幂与普通幂的相互转化
+
+我们记上升阶乘幂 $x^{\overline{n}}=\prod_{k=0}^{n-1} (x+k)$ 。
+
+则可以利用下面的恒等式将上升幂转化为普通幂：
 
 $$
-S_n^m = m \times S_{n-1}^{m} + S_{n-1}^{m-1}
+x^{\overline{n}}=\sum_{k} \begin{bmatrix}n\\ k\end{bmatrix} x^k
 $$
 
-$$
-S_n^1 = 1,S_n^0 = 0,S_n^n = 1
-$$
-
-而这些性质就可以总结成：
+如果将普通幂转化为上升幂，则有下面的恒等式：
 
 $$
-S_n^3 = \frac{1}{2} \times (3^{n-1}+1) - 2^{n-1}
+x^n=\sum_{k} \begin{Bmatrix}n\\ k\end{Bmatrix} (-1)^{n-k} x^{\overline{k}}
 $$
+
+### 下降幂与普通幂的相互转化
+
+我们记下降阶乘幂 $x^{\underline{n}}=\dfrac{x!}{(x-n)!}=\prod_{k=0}^{n-1} (x-k)$ 。
+
+则可以利用下面的恒等式将普通幂转化为下降幂：
+
+$$
+x^n=\sum_{k} \begin{Bmatrix}n\\ k\end{Bmatrix} x^{\underline{k}}
+$$
+
+如果将下降幂转化为普通幂，则有下面的恒等式：
+
+$$
+x^{\underline{n}}=\sum_{k} \begin{bmatrix}n\\ k\end{bmatrix} (-1)^{n-k} x^k
+$$
+
+## 习题
+
+ [HDU3625 Examining the Rooms](http://acm.hdu.edu.cn/showproblem.php?pid=3625) 
+
+## 参考资料与注释
+
+1.  [Stirling Number of the First Kind - Wolfram MathWorld](http://mathworld.wolfram.com/StirlingNumberoftheFirstKind.html) 
+2.  [Stirling Number of the Second Kind - Wolfram MathWorld](http://mathworld.wolfram.com/StirlingNumberoftheSecondKind.html) 
