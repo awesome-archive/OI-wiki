@@ -1,440 +1,466 @@
-> 如何用 $\text{Splay}$ 维护二叉查找树。
+本页面将简要介绍如何用 Splay 维护二叉查找树．
 
-* * *
+## 定义
 
-## 简介
+**Splay 树**，或 **伸展树**，是一种平衡二叉查找树，它通过 **伸展（splay）操作** 不断将某个节点旋转到根节点，使得整棵树仍然满足二叉查找树的性质，能够在均摊 $O(\log n)$ 时间内完成插入、查找和删除操作．[^degen]
 
-$\text{Splay}$ 是一种二叉查找树，它通过不断将某个节点旋转到根节点，使得整棵树仍然满足二叉查找树的性质，并且保持平衡而不至于退化为链，它由 Daniel Sleator 和 Robert Tarjan 发明。
+Splay 树由 Daniel Sleator 和 Robert Tarjan 于 1985 年发明．
 
-* * *
+## 基本结构与操作
 
-## 结构
+本节讨论 Splay 树的基本结构和它的核心操作，其中最为重要的是伸展操作．
 
-### 二叉查找树的性质
+Splay 树是一棵二叉查找树，即树中任意节点都满足性质：左子树任意节点的值 $<$ 该节点的值 $<$ 右子树任意节点的值．
 
-首先肯定是一棵二叉树！
+### 维护信息
 
-能够在这棵树上查找某个值的性质：左儿子的值 $<$ 根节点的值 $<$ 右儿子的值。
+本文使用数组模拟指针来实现 Splay 树，需要维护如下信息：
 
-### 节点维护信息
+|     rt     |       id       | fa\[i] | ch\[i]\[0/1] |  val\[i] |    cnt\[i]   |  sz\[i]  |
+| :--------: | :------------: | :----: | :----------: | :------: | :----------: | :------: |
+| 根节点编号 | 已使用节点个数 |  父亲  | 左右儿子编号 | 节点权值 | 权值出现次数 | 子树大小 |
 
-| $rt$  | $tot$ | $fa[i]$ | $ch[i][0/1]$ | $val[i]$ | $cnt[i]$ | $sz[i]$ |
-| :---- | :---- | :------ | :----------- | :------- | :------- | :------ |
-| 根节点编号 | 节点个数  | 父亲      | 左右儿子编号       | 节点权值     | 权值出现次数   | 子树大小    |
+初始化时，所有信息都置零即可．
 
-* * *
+### 辅助操作
 
-## 操作
+首先是一些简单的辅助操作：
 
-### 基本操作
+-   `dir(x)`：判断节点 $x$ 是父亲节点的左儿子还是右儿子；
+-   `push_up(x)`：在改变节点位置后，根据子节点信息更新节点 $x$ 的信息．
 
--   $\text{maintain}(x)$：在改变节点位置前，将节点 $x$ 的 $\text{size}$ 更新。
--   $\text{get}(x)$：判断节点 $x$ 是父亲节点的左儿子还是右儿子。
--   $\text{clear}(x)$：销毁节点 $x$。
-
-```cpp
-void maintain(int x) { sz[x] = sz[ch[x][0]] + sz[ch[x][1]] + cnt[x]; }
-bool get(int x) { return x == ch[fa[x]][1]; }
-void clear(int x) { ch[x][0] = ch[x][1] = fa[x] = val[x] = sz[x] = cnt[x] = 0; }
-```
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:aux"
+    ```
 
 ### 旋转操作
 
-为了使 $\text{Splay}$ 保持平衡而进行旋转操作，旋转的本质是将某个节点上移一个位置。
+为了使 Splay 保持平衡，需要进行旋转操作．旋转的作用是将某个节点上移一个位置．
 
-**旋转需要保证**：
+旋转需要保证：
 
--   整棵 $\text{Splay}$ 的中序遍历不变（不能破坏二叉查找树的性质）。
--   受影响的节点维护的信息依然正确有效。
--   $\text{root}$ 必须指向旋转后的根节点。
+-   整棵 Splay 的中序遍历不变（不能破坏二叉查找树的性质）；
+-   受影响的节点维护的信息依然正确有效；
+-   `rt` 必须指向旋转后的根节点．
 
-在 $\text{Splay}$ 中旋转分为两种：左旋和右旋。
+在 Splay 中旋转分为两种：左旋和右旋．
 
-![](./images/splay2.png)
+![](./images/splay-rotate.svg)
 
-**具体分析旋转步骤**（假设需要旋转的节点为 $x$，其父亲为 $y$，以右旋为例）
+观察图示可知，如果要通过旋转将节点 $x$（左旋时的 $1$ 和右旋时的 $2$）上移，则旋转的方向由该节点是其父节点的左节点还是右节点唯一确定．因此，实现旋转操作时，只需要将要上移的节点 $x$ 传入即可．
 
-1.  将 $y$ 的左儿子指向 $x$ 的右儿子，且 $x$ 的右儿子的父亲指向 $y$。
-    `ch[y][0]=ch[x][1]; fa[ch[x][1]]=y;`
-2.  将 $x$ 的右儿子指向 $y$，且 $y$ 的父亲指向 $x$。
-    `ch[x][chk^1]=y; fa[y]=x;`
-3.  如果原来的 $y$ 还有父亲 $z$，那么把 $z$ 的某个儿子（原来 $y$ 所在的儿子位置）指向 $x$，且 $x$ 的父亲指向 $z$。
-    `fa[x]=z; if(z) ch[z][y==ch[z][1]]=x;`
+具体分析旋转步骤：（假设需要上移的节点为 $x$，以右旋为例）
 
-```cpp
-void rotate(int x) {
-  int y = fa[x], z = fa[y], chk = get(x);
-  ch[y][chk] = ch[x][chk ^ 1];
-  fa[ch[x][chk ^ 1]] = y;
-  ch[x][chk ^ 1] = y;
-  fa[y] = x;
-  fa[x] = z;
-  if (z) ch[z][y == ch[z][1]] = x;
-  maintain(x);
-  maintain(y);
-}
-```
+1.  首先，记录节点 $x$ 的父节点 $y$，以及 $y$ 的父节点 $z$（可能为空），并记录 $x$ 是 $y$ 的左子节点还是右子节点；
+2.  按照旋转后的树中自下向上的顺序，依次更新 $y$ 的左子节点为 $x$ 的右子节点，$x$ 的右子节点为 $y$，以及若 $z$ 非空，$z$ 的子节点为 $x$；
+3.  按照同样的顺序，依次更新当前 $y$ 的左子节点（若存在）的父节点为 $y$，$y$ 的父节点为 $x$，以及 $x$ 的父节点为 $z$；
+4.  自下而上维护节点信息．
 
-### Splay 操作
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:rotate"
+    ```
 
-$\text{Splay}$ 规定：每访问一个节点后都要强制将其旋转到根节点。此时旋转操作具体分为 $6$ 种情况讨论（其中 $x$ 为需要旋转到根的节点）
+在实现所有函数时，都应注意不要修改节点 $0$ 的信息．
 
-![](./images/splay1.png)
+### 伸展操作
 
--   如果 $x$ 的父亲是根节点，直接将 $x$ 左旋或右旋（图 $1,2$）。
--   如果 $x$ 的父亲不是根节点，且 $x$ 和父亲的儿子类型相同，首先将其父亲左旋或右旋，然后将 $x$ 右旋或左旋（图 $3,4$）。
--   如果 $x$ 的父亲不是根节点，且 $x$ 和父亲的儿子类型不同，将 $x$ 左旋再右旋、或者右旋再左旋（图 $5,6$）。
+Splay 树要求每访问一个节点 $x$ 后都要强制将其旋转到根节点．该操作也称为伸展操作．
 
-分析起来一大串，其实代码一小段。大家可以自己模拟一下 $6$ 种旋转情况，就能理解 $\text{Splay}$ 的基本思想了。
+设刚访问的节点为 $x$．要做伸展操作，就是要对 $x$ 做一系列的 **伸展步骤**．每次对 $x$ 做一次伸展步骤，$x$ 到根节点的距离都会更近．定义 $p$ 为 $x$ 的父节点．伸展步骤有三种：
 
-```cpp
-void splay(int x) {
-  for (int f = fa[x]; f = fa[x], f; rotate(x))
-    if (fa[f]) rotate(get(x) == get(f) ? f : x);
-  rt = x;
-}
-```
+1.  **zig**: 在 $p$ 是根节点时操作．Splay 树会根据 $x$ 和 $p$ 间的边旋转．**zig** 用于处理深度的奇偶性问题，仅当 $x$ 在伸展操作开始时具有奇数深度时，才作为伸展操作的最后一步执行．
 
-### 插入操作
+    ![splay-zig](./images/splay-zig.svg)
 
-插入操作是一个比较复杂的过程，具体步骤如下（插入的值为 $k$）：
+    即直接将 $x$ 右旋或左旋（图 1, 2）．
 
--   如果树空了则直接插入根并退出。
--   如果当前节点的权值等于 $k$ 则增加当前节点的大小并更新节点和父亲的信息，将当前节点进行 $\text{Splay}$ 操作。
--   否则按照二叉查找树的性质向下找，找到空节点就插入即可（当然别忘了 $\text{Splay}$ 操作哦）。
+    ![图 1](./images/splay-rotate1.svg)![图 2](./images/splay-rotate2.svg)
 
-```cpp
-void ins(int k) {
-  if (!rt) {
-    val[++tot] = k;
-    cnt[tot]++;
-    rt = tot;
-    maintain(rt);
-    return;
-  }
-  int cnr = rt, f = 0;
-  while (1) {
-    if (val[cnr] == k) {
-      cnt[cnr]++;
-      maintain(cnr);
-      maintain(f);
-      splay(cnr);
-      break;
-    }
-    f = cnr;
-    cnr = ch[cnr][val[cnr] < k];
-    if (!cnr) {
-      val[++tot] = k;
-      cnt[tot]++;
-      fa[tot] = f;
-      ch[f][val[f] < k] = tot;
-      maintain(tot);
-      maintain(f);
-      splay(tot);
-      break;
-    }
-  }
-}
-```
+2.  **zig-zig**: 在 $p$ 不是根节点且 $x$ 和 $p$ 都是右侧子节点或都是左侧子节点时操作．下方例图显示了 $x$ 和 $p$ 都是左侧子节点时的情况．Splay 树首先按照连接 $p$ 与其父节点 $g$ 的边旋转，然后按照连接 $x$ 和 $p$ 的边旋转．
 
-### 查询 x 的排名
+    ![splay-zig-zig](./images/splay-zig-zig.svg)
 
-根据二叉查找树的定义和性质，显然可以按照以下步骤查询 $x$ 的排名：
+    即首先将 $p$ 右旋或左旋，然后将 $x$ 右旋或左旋（图 3, 4）．
 
--   如果 $x$ 比当前节点的权值小，向其左子树查找。
--   如果 $x$ 比当前节点的权值大，将答案加上左子树（$size$）和当前节点（$cnt$）的大小，向其右子树查找。
--   如果 $x$ 与当前节点的权值相同，将答案加 $1$ 并返回。
+    ![图 3](./images/splay-rotate3.svg)![图 4](./images/splay-rotate4.svg)
 
-注意最后需要进行 $\text{Splay}$ 操作。
+3.  **zig-zag**: 在 $p$ 不是根节点且 $x$ 和 $p$ 一个是右侧子节点一个是左侧子节点时操作．Splay 树首先按 $p$ 和 $x$ 之间的边旋转，然后按旋转后 $x$ 和 $g$ 之间新生成的边旋转．
 
-```cpp
-int rk(int k) {
-  int res = 0, cnr = rt;
-  while (1) {
-    if (k < val[cnr]) {
-      cnr = ch[cnr][0];
-    } else {
-      res += sz[ch[cnr][0]];
-      if (k == val[cnr]) {
-        splay(cnr);
-        return res + 1;
-      }
-      res += cnt[cnr];
-      cnr = ch[cnr][1];
-    }
-  }
-}
-```
+    ![splay-zig-zag](./images/splay-zig-zag.svg)
 
-### 查询排名 x 的数
+    即将 $x$ 先左旋再右旋或先右旋再左旋（图 5, 6）．
+
+    ![图 5](./images/splay-rotate5.svg)![图 6](./images/splay-rotate6.svg)
+
+???+ tip "Tip"
+    请读者尝试自行模拟 $6$ 种旋转情况，以理解伸展操作的基本思想．
+
+比较三种伸展步骤可知，要区分此时应使用哪种操作，关键是要判断 $x$ 是否是根节点的子节点，以及 $x$ 和它父节点是否在各自的父节点同侧．
+
+此处提供的实现，可以指定任意根节点 $z$，并将它的子树内任意节点 $x$ 上移至 $z$ 处：
+
+1.  首先记录根节点 $z$ 的父节点 $w$，从而可以利用 `fa[x] == w` 判断 $x$ 已经位于根节点处；
+2.  记录 $x$ 当前的父节点 $y$，如果 $y$ 和 $w$ 相同，说明 $x$ 已经到达根节点；
+3.  否则，利用 `fa[y] == w` 判断 $y$ 是否是根节点．如果是，直接做 zig 操作将 $x$ 旋转；如果不是，利用 `dir(x) == dir(y)` 判断使用 zig-zig 还是 zig-zag，前者先旋转 $y$ 再旋转 $x$，后者直接旋转两次 $x$．
+
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:splay"
+    ```
+
+伸展操作是 Splay 树的核心操作，也是它的时间复杂度能够得到保证的关键步骤．请务必保证每次向下访问节点后，都进行一次伸展操作．
+
+另外，伸展操作会将当前节点 $x$ 到根节点 $z$ 的路径上的所有节点信息自下而上地更新一遍．正是因为这一点，才可以修改非根节点，再通过伸展操作将它上移至根来完成整个树的信息更新．
+
+### 时间复杂度
+
+对大小为 $n$ 的 Splay 树做 $m$ 次伸展操作的复杂度是 $O((m+n)\log n)$ 的，单次均摊复杂度是 $O(\log n)$ 的．
+
+??? note "基于势能分析的复杂度证明"
+    为此只需分析 **zig**、**zig-zig** 和 **zig-zag** 三种操作的复杂度．为此，我们采用 **势能分析法**，通过研究势能的变化来推导操作的均摊复杂度．假设对一棵包含 $n$ 个节点的 Splay 树进行了 $m$ 次伸展操作，可以通过如下方式进行分析：
+    
+    **定义**：
+    
+    1.  **单个节点的势能**：$w(x) = \log(\text{size}(x))$，其中 $\text{size}(x)$ 表示以节点 $x$ 为根的子树大小．
+    2.  **整棵树的势能**：$\varphi = \sum w(x)$，即树中所有节点势能的总和，初始势能满足 $\varphi_0 \leq n \log n$．
+    3.  **第 $i$ 次操作的均摊成本**：$c_i = t_i + \varphi_i - \varphi_{i-1}$，其中 $t_i$ 为实际操作代价，$\varphi_i$ 和 $\varphi_{i-1}$ 分别为操作后和操作前的势能．
+    
+    **性质**：
+    
+    1.  如果 $p$ 是 $x$ 的父节点，则有 $w(p) \geq w(x)$，即父节点的势能不小于子节点的势能．
+    
+    2.  由于根节点的子树大小在操作前后保持不变，因此根节点的势能在操作过程中不变．
+    
+    3.  如果 $\text{size}(p)\ge\text{size}(x)+\text{size}(y)$，那么有 $2w(p) - w(x) - w(y) \geq 2$．
+    
+    ??? note "性质 3 的证明"
+        根据均值不等式可知
+        
+        $$
+        \begin{aligned}
+        2w(p) - w(x) - w(y) 
+        &= \log\dfrac{\text{size}(p)^2}{\text{size}(x)\cdot\text{size}(y)} \\
+        &\ge \log\dfrac{\left(\text{size}(x)+\text{size}(y)\right)^2}{\text{size}(x)\cdot\text{size}(y)} \\
+        &\ge \log 4 \\
+        &= 2.
+        \end{aligned}
+        $$
+    
+    接下来，分别对 **zig**、**zig-zig** 和 **zig-zag** 操作进行势能分析．设操作前后的节点 $x$ 的势能分别是 $w(x)$ 和 $w'(x)$．节点的记号与 [上文](#伸展操作) 一致．
+    
+    **zig**：根据性质 1 和 2，有 $w(p) = w'(x)$，且 $w'(x) \geq w'(p)$．由此，均摊成本为
+    
+    $$
+    \begin{aligned}
+    c_i &= 1 + w'(x) + w'(p) - w(x) - w(p)\\
+    &= 1 + w'(p) - w(x)\\
+    &\leq 1 + w'(x) - w(x).
+    \end{aligned}
+    $$
+    
+    **zig-zig**：根据性质 1 和 2，有 $w(g) = w'(x)$，且 $w'(x) \geq w'(p)$，$w(x) \leq w(p)$．因为
+    
+    $$
+    \begin{aligned}
+    \text{size}'(x) 
+    &= 3 + \text{size}(A) + \text{size}(B) + \text{size}(C) + \text{size}(D) \\
+    &> (1 + \text{size}(A) + \text{size}(B)) + (1 + \text{size}(C) + \text{size}(D)) \\
+    &= \text{size}(x) + \text{size}'(g),
+    \end{aligned}
+    $$
+    
+    根据性质 3 可得
+    
+    $$
+    2 w'(x) - w(x) - w'(g) \geq 2.
+    $$
+    
+    由此，均摊成本为
+    
+    $$
+    \begin{aligned}
+    c_i &= 2 + w'(x) + w'(p) + w'(g) - w(x) - w(p) - w(g) \\
+    &= 2 + w'(p) + w'(g) - w(x) - w(p) \\
+    &\le (2 w'(x) - w(x) - w'(g)) + w'(p) + w'(g) - w(x) - w(p) \\
+    &= 2(w'(x)-w(x)) + w'(p) - w(p) \\
+    &\le 3(w'(x)-w(x)).
+    \end{aligned}
+    $$
+    
+    **zig-zag**：根据性质 1 和 2，有 $w(g) = w'(x)$，且 $w(p) \geq w(x)$．因为 $\text{size}'(x)>\text{size}'(p)+\text{size}'(g)$，根据性质 3，可得
+    
+    $$
+    2 \cdot w'(x) - w'(g) - w'(p) \geq 2.
+    $$
+    
+    由此，均摊成本为
+    
+    $$
+    \begin{aligned}
+    c_i &= 2 + w'(x) + w'(p) + w'(g) - w(x) - w(p) - w(g) \\
+    &= 2 + w'(p) + w'(g) - w(x) - w(p) \\
+    &\le (2w'(x) - w'(g) - w'(p)) + w'(p) + w'(g) - w(x) - w(p) \\
+    &= 2w'(x) - w(x) - w(p) \\
+    &\le 2(w'(x) - w(x)).
+    \end{aligned}
+    $$
+    
+    **单次伸展操作**：
+    
+    令 $w^{(j)}(x)=(w^{(j-1)})'(x)$ 且 $w^{(0)}(x)=w(x)$．假设一次伸展操作共包含 $k$ 个伸展步骤，最终将节点 $x_{1}$ 上移至根节点．这必然经过若干次 **zig-zig** 和 **zig-zag** 操作和至多一次 **zig** 操作，前两种操作的均摊成本均不超过 $3(w'(x)-w(x))$，而最后一次操作的均摊成本不超过 $3(w'(x) - w(x))+1$，所以总的均摊成本不超过
+    
+    $$
+    3(w^{(k)}(x_1) - w^{(0)}(x_1)) + 1 \le 3\log n + 1.
+    $$
+    
+    因此，一次伸展操作的均摊复杂度是 $O(\log n)$ 的．从而，基于伸展的插入、查询、删除等操作的时间复杂度也为均摊 $O(\log n)$．
+    
+    **结论**：
+    
+    在进行 $m$ 次伸展操作之后，实际成本
+    
+    $$
+    \begin{aligned}
+    \sum_{i=1}^m t_i &= \sum_{i=1}^m \left(c_i + \varphi_{i-1} - \varphi_i \right) \\
+    &= \sum_{i=1}^m c_i + \varphi_0 - \varphi_m \\
+    &\le m(3\log n+1) + n\log n.
+    \end{aligned}
+    $$
+    
+    因此，$m$ 次伸展操作的实际时间复杂度是 $O((m+n)\log n)$ 的．
+
+??? info "为什么 Splay 树的再平衡操作可以获得 $O(\log n)$ 的均摊复杂度？"
+    朴素的再平衡思路就是对节点反复进行旋转操作使其上升，直到它成为根节点．这种朴素思路的问题在于，对于所有子节点都是左（右）节点的链状树来说，它相当于反复进行 **zig** 操作，因而 **zig** 操作的均摊复杂度中的常数项 $1$ 会不断累积，造成最终的均摊复杂度达到 $O(n)$ 级别．Splay 树的再平衡操作的设计，避免了连续 **zig** 的情形中的常数累积，使得一次完整的伸展操作中，至多进行一次单独的 **zig** 操作，从而优化了时间复杂度．
+
+## 平衡树操作
+
+本节讨论基于 Splay 树实现平衡树的常见操作的方法．其中，较为重要的是按照值或排名查找元素，它们可以将某个特定的元素找到，并上移至根节点处，以便后续处理．
+
+作为例子，本节将讨论模板题目 [普通平衡树](https://loj.ac/problem/104) 的实现．
+
+### 按照值查找
+
+作为二叉查找树，可以通过值 $v$ 查找到相应的节点，只需要将待查找的值 $v$ 和当前节点的值比较即可，找到后将该元素上移至根部即可．
+
+应注意，经常存在树中不存在相应的节点的情形．对于这种情形，要记录最后一个访问的节点（即实现中的 $y$），并将 $y$ 上移至根部．此时，节点 $y$ 存储的值必然要么是所有小于 $v$ 的元素中最大的（即 $v$ 的前驱），要么是所有大于 $v$ 的元素中最小的（即 $v$ 的后继）．这是因为查找过程保证，左子树总是存储小于 $v$ 的值，而右子树总是存储大于 $v$ 的值．
+
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:find"
+    ```
+
+该实现允许指定任何节点 $z$ 作为根节点，并在它的子树内按值查找．
+
+### 按照排名访问
+
+因为记录了子树大小信息，所以 Splay 树还可以通过排名访问元素，即查找树中第 $k$ 小的元素．
 
 设 $k$ 为剩余排名，具体步骤如下：
 
--   如果左子树非空且剩余排名 $k$ 不大于左子树的大小 $size$，那么向左子树查找。
--   否则将 $k$ 减去左子树的和根的大小。如果此时 $k$ 的值小于等于 $0$，则返回根节点的权值，否则继续向右子树查找。
+-   如果左子树非空且剩余排名 $k$ 不大于左子树的大小，那么向左子树查找；
+-   否则，如果 $k$ 不大于左子树的大小与根节点的权值出现次数之和，那么根节点就是要寻找的；
+-   否则，将 $k$ 减去左子树的大小与根节点的权值出现次数之和，继续向右子树查找；
+-   将最终找到的元素上移至根部．
 
-```cpp
-int kth(int k) {
-  int cnr = rt;
-  while (1) {
-    if (ch[cnr][0] && k <= sz[ch[cnr][0]]) {
-      cnr = ch[cnr][0];
-    } else {
-      k -= cnt[cnr] + sz[ch[cnr][0]];
-      if (k <= 0) return val[cnr];
-      cnr = ch[cnr][1];
-    }
-  }
-}
-```
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:loc"
+    ```
 
-### 查询前驱
+该实现需要保证排名 $k$ 不超过根 $z$ 处的树大小．
 
-前驱定义为小于 $x$ 的最大的数，那么查询前驱可以转化为：将 $x$ 插入（此时 $x$ 已经在根的位置了），前驱即为 $x$ 的左子树中最右边的节点，最后将 $x$ 删除即可。
+模板题目中操作 $4$ 要求按照排名返回值，直接调用该方法，并返回值即可．
 
-```cpp
-int pre() {
-  int cnr = ch[rt][0];
-  while (ch[cnr][1]) cnr = ch[cnr][1];
-  return cnr;
-}
-```
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:find-kth"
+    ```
 
-### 查询后继
+### 合并操作
 
-后继定义为大于 $x$ 的最小的数，查询方法和前驱类似：$x$ 的右子树中最左边的节点。
+有些时候需要合并两棵 Splay 树．
 
-```cpp
-int nxt() {
-  int cnr = ch[rt][1];
-  while (ch[cnr][0]) cnr = ch[cnr][0];
-  return cnr;
-}
-```
+设两棵树的根节点分别为 $x$ 和 $y$，那么为了保证结果仍是二叉查找树，需要要求 $x$ 树中的最大值小于 $y$ 树中的最小值．这一条件通常都可以满足，因为两棵树往往是从更大的子树中分裂出的．
+
+合并操作如下：
+
+-   如果 $x$ 和 $y$ 其中之一或两者都为空树，直接返回不为空的那一棵树的根节点或空树；
+-   否则，通过 `loc(y, 1)` 将 $y$ 树中的最小值上移至根 $y$ 处，再将它的左节点（此时必然为空）设置为 $x$，并更新节点信息，返回节点 $y$．
+
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:merge"
+    ```
+
+分裂操作类似．因而，Splay 树可以模拟 [无旋 treap](./treap.md#无旋-treap) 的思路做各种操作，包括区间操作．[后文](#序列操作) 会介绍更具有 Splay 树风格的区间操作处理方法．
+
+### 插入操作
+
+插入操作是一个比较复杂的过程．具体步骤如下：（假设插入的值为 $v$）
+
+-   类似按值查找的过程，根据 $v$ 向下查找到存储 $v$ 的节点或者空节点，过程中记录父节点 $y$；
+-   如果存在存储 $v$ 的节点 $x$，直接更新信息，否则就新建节点 $x$；
+-   做伸展操作，将最后一个节点 $x$ 上移至根部．
+
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:insert"
+    ```
+
+该实现允许直接向空树内插入值．若不想处理空树，可以在树中提前插入哑节点．
 
 ### 删除操作
 
-删除操作也是一个比较复杂的操作，具体步骤如下：
+删除操作也是一个比较复杂的操作．具体步骤如下：（假设删除的值为 $v$）
 
--   首先将 $x$ 旋转到根的位置。
--   接下来分为多个情况考虑：
+-   首先按照值 $v$ 查找存储它的节点，并上移至根部；
+-   如果不存在存储它的节点，直接返回；（上一步已经做了伸展操作）
+-   否则，更新节点信息；
+-   如果根节点的权值出现次数减为零，就删除该节点，即合并左右子树作为新的根节点，注意合并前需要更新两个子树的根的父节点为空．
 
-1.  如果有不止一个 $x$，那么将 $cnt[x]$ 减 $1$ 并退出。
-2.  如果 $x$ 没有儿子节点，那么直接将当前节点 $\text{clear}$ 并退出。
-3.  如果 $x$ 只有一个儿子，那么先将当前节点 $\text{clear}$ 再把唯一的儿子作为根节点。
-4.  否则将 $x$ 的前驱旋转到根并作为根节点，将 $x$ 的右子树接到根节点的右子树上，最后要将根的信息更新。
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:remove"
+    ```
 
-```cpp
-void del(int k) {
-  rk(k);
-  if (cnt[rt] > 1) {
-    cnt[rt]--;
-    maintain(rt);
-    return;
-  }
-  if (!ch[rt][0] && !ch[rt][1]) {
-    clear(rt);
-    rt = 0;
-    return;
-  }
-  if (!ch[rt][0]) {
-    int cnr = rt;
-    rt = ch[rt][1];
-    fa[rt] = 0;
-    clear(cnr);
-    return;
-  }
-  if (!ch[rt][1]) {
-    int cnr = rt;
-    rt = ch[rt][0];
-    fa[rt] = 0;
-    clear(cnr);
-    return;
-  }
-  int x = pre(), cnr = rt;
-  splay(x);
-  fa[ch[cnr][1]] = x;
-  ch[x][1] = ch[cnr][1];
-  clear(cnr);
-  maintain(rt);
-}
-```
+### 查询排名
 
-* * *
+直接按照值 $v$ 访问节点（并上移至根），然后返回相应的排名即可．
 
-## 完整代码
+注意，当 $v$ 不存在时，方法 `find(rt, v)` 返回的根和 $v$ 的大小关系无法确定，需要单独讨论．
 
-```cpp
-#include <cstdio>
-const int N = 100005;
-int rt, tot, fa[N], ch[N][2], val[N], cnt[N], sz[N];
-struct Splay {
-  void maintain(int x) { sz[x] = sz[ch[x][0]] + sz[ch[x][1]] + cnt[x]; }
-  bool get(int x) { return x == ch[fa[x]][1]; }
-  void clear(int x) {
-    ch[x][0] = ch[x][1] = fa[x] = val[x] = sz[x] = cnt[x] = 0;
-  }
-  void rotate(int x) {
-    int y = fa[x], z = fa[y], chk = get(x);
-    ch[y][chk] = ch[x][chk ^ 1];
-    fa[ch[x][chk ^ 1]] = y;
-    ch[x][chk ^ 1] = y;
-    fa[y] = x;
-    fa[x] = z;
-    if (z) ch[z][y == ch[z][1]] = x;
-    maintain(x);
-    maintain(y);
-  }
-  void splay(int x) {
-    for (int f = fa[x]; f = fa[x], f; rotate(x))
-      if (fa[f]) rotate(get(x) == get(f) ? f : x);
-    rt = x;
-  }
-  void ins(int k) {
-    if (!rt) {
-      val[++tot] = k;
-      cnt[tot]++;
-      rt = tot;
-      maintain(rt);
-      return;
-    }
-    int cnr = rt, f = 0;
-    while (1) {
-      if (val[cnr] == k) {
-        cnt[cnr]++;
-        maintain(cnr);
-        maintain(f);
-        splay(cnr);
-        break;
-      }
-      f = cnr;
-      cnr = ch[cnr][val[cnr] < k];
-      if (!cnr) {
-        val[++tot] = k;
-        cnt[tot]++;
-        fa[tot] = f;
-        ch[f][val[f] < k] = tot;
-        maintain(tot);
-        maintain(f);
-        splay(tot);
-        break;
-      }
-    }
-  }
-  int rk(int k) {
-    int res = 0, cnr = rt;
-    while (1) {
-      if (k < val[cnr]) {
-        cnr = ch[cnr][0];
-      } else {
-        res += sz[ch[cnr][0]];
-        if (k == val[cnr]) {
-          splay(cnr);
-          return res + 1;
-        }
-        res += cnt[cnr];
-        cnr = ch[cnr][1];
-      }
-    }
-  }
-  int kth(int k) {
-    int cnr = rt;
-    while (1) {
-      if (ch[cnr][0] && k <= sz[ch[cnr][0]]) {
-        cnr = ch[cnr][0];
-      } else {
-        k -= cnt[cnr] + sz[ch[cnr][0]];
-        if (k <= 0) return val[cnr];
-        cnr = ch[cnr][1];
-      }
-    }
-  }
-  int pre() {
-    int cnr = ch[rt][0];
-    while (ch[cnr][1]) cnr = ch[cnr][1];
-    return cnr;
-  }
-  int nxt() {
-    int cnr = ch[rt][1];
-    while (ch[cnr][0]) cnr = ch[cnr][0];
-    return cnr;
-  }
-  void del(int k) {
-    rk(k);
-    if (cnt[rt] > 1) {
-      cnt[rt]--;
-      maintain(rt);
-      return;
-    }
-    if (!ch[rt][0] && !ch[rt][1]) {
-      clear(rt);
-      rt = 0;
-      return;
-    }
-    if (!ch[rt][0]) {
-      int cnr = rt;
-      rt = ch[rt][1];
-      fa[rt] = 0;
-      clear(cnr);
-      return;
-    }
-    if (!ch[rt][1]) {
-      int cnr = rt;
-      rt = ch[rt][0];
-      fa[rt] = 0;
-      clear(cnr);
-      return;
-    }
-    int x = pre(), cnr = rt;
-    splay(x);
-    fa[ch[cnr][1]] = x;
-    ch[x][1] = ch[cnr][1];
-    clear(cnr);
-    maintain(rt);
-  }
-} tree;
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:find-rank"
+    ```
 
-int main() {
-  int n, opt, x;
-  for (scanf("%d", &n); n; --n) {
-    scanf("%d%d", &opt, &x);
-    if (opt == 1)
-      tree.ins(x);
-    else if (opt == 2)
-      tree.del(x);
-    else if (opt == 3)
-      printf("%d\n", tree.rk(x));
-    else if (opt == 4)
-      printf("%d\n", tree.kth(x));
-    else if (opt == 5)
-      tree.ins(x), printf("%d\n", val[tree.pre()]), tree.del(x);
-    else
-      tree.ins(x), printf("%d\n", val[tree.nxt()]), tree.del(x);
-  }
-  return 0;
-}
-```
+### 查询前驱
 
-* * *
+前驱定义为小于 $v$ 的最大的数．具体步骤如下：
 
-## 例题
+-   按照值 $v$ 访问节点（并上移至根部）；
+-   如果根部的值小于 $v$，那么它必然是最大的那个，直接返回；
+-   否则，在左子树中找到最大值，并上移至根部．
 
-以下题目都是裸的 $\text{Splay}$ 维护二叉查找树。~~（直接套板子即可）~~
+最后一步相当于直接调用 `loc(ch[rt][0], sz[ch[rt][0]])`，只是省去了不必要的判断．
 
--   [【模板】普通平衡树](https://www.luogu.org/problemnew/show/P3369)
--   [\[HNOI2002\] 营业额统计](https://www.lydsy.com/JudgeOnline/problem.php?id=1588)
--   [\[HNOI2004\] 宠物收养所](https://www.lydsy.com/JudgeOnline/problem.php?id=1208)
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:find-prev"
+    ```
 
-## 练习题
+该实现允许前驱不存在，此时返回 $-1$．
 
-[bzoj 1552 \[Cerc2007\] robotic sort](https://www.lydsy.com/JudgeOnline/problem.php?id=1552) （权限题）
+### 查询后继
 
-[luogu P3380 【模板】二逼平衡树（树套树）](https://www.luogu.org/problemnew/show/P3380)
+后继定义为大于 $v$ 的最小的数．查询方法和前驱类似，只是将左子树的最大值换成了右子树的最小值，即调用 `loc(ch[rt][1], 1)`．
 
-[bzoj 2827 千山鸟飞绝](https://www.lydsy.com/JudgeOnline/problem.php?id=2827)
+???+ example "实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:find-next"
+    ```
 
-[bzoj 4923 \[Lydsy1706 月赛\]K 小值查询](https://www.lydsy.com/JudgeOnline/problem.php?id=4923)
+### 参考实现
 
-* * *
+本节的最后，给出模板题目 [普通平衡树](https://loj.ac/problem/104) 的参考实现．
 
-> 本文部分内容引用于 [algocode 算法博客](https://algocode.net)，特别鸣谢！
+??? example "参考实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-1.cpp:full-text"
+    ```
+
+## 序列操作
+
+Splay 树也可以运用在序列上，用于维护区间信息．与线段树对比，Splay 树常数较大，但是支持更复杂的序列操作，如区间翻转等．上文提到 Splay 树同样支持分裂和合并操作，因而可以模拟 [无旋 treap](./treap.md#无旋-treap) 进行区间操作，在此不再过多讨论．本节主要讨论基于伸展操作的区间操作实现方法．
+
+将序列建成的 Splay 树有如下性质：
+
+-   Splay 树的中序遍历相当于原序列从左到右的遍历；
+-   Splay 树上的一个节点代表原序列的一个元素；
+-   Splay 树上的一棵子树，代表原序列的一段区间．
+
+因为有伸展操作，可以快速提取出代表某个区间的 Splay 子树．
+
+作为例子，本节将讨论模板题目 [文艺平衡树](https://loj.ac/problem/105) 的实现．
+
+### 根据序列建树
+
+在操作之前，需要根据所给的序列先把 Splay 树建出来．根据 Splay 树的特性，直接建出一棵只有左儿子的链即可．时间复杂度是 $O(n)$ 的．
+
+???+ example "参考实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-2.cpp:build"
+    ```
+
+最后的伸展操作自下而上地更新了节点信息．为了后文区间操作方便，序列左右两侧添加了两个哨兵节点．
+
+### 区间翻转
+
+以区间翻转为例，可以理解区间操作的方法：（设区间为 $[L,R]$）
+
+-   首先将节点 $L-1$ 上移到根节点，再在其右子树中，将节点 $R+1$ 上移到右子树的根节点；
+-   此时，设 $x$ 为根节点的右子节点的左子节点，则以 $x$ 为根的子树就对应着区间 $[L,R]$；
+-   在 $x$ 处对区间 $[L,R]$ 做操作，并打上懒标记；
+-   在 $x$ 处将标记下传一次，然后利用伸展操作将 $x$ 上移到根．
+
+第一步需要的操作就是前文平衡树操作中的「按照排名访问」，因为元素的标号就是它的排名．因为涉及懒标记的管理，它的实现与上文略有不同．
+
+???+ example "参考实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-2.cpp:reverse"
+    ```
+
+最后一步的伸展操作并非为了保证复杂度正确，而是为了更新节点信息．因为伸展操作涉及到节点 $x$ 的左右子节点，所以之前需要将节点 $x$ 处的标记先下传一次．当然，仅对于区间翻转操作而言，子区间的翻转不会对祖先节点产生影响，所以省去这一步骤也是正确的．此处实现保留这两行，是为了说明一般的情形下的操作方法．
+
+### 懒标记管理
+
+首先，需要辅助函数 `lazy_reverse(x)` 和 `push_down(x)`．前者交换左右节点，并更新懒标记；后者将标记下传．
+
+???+ example "参考实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-2.cpp:push-down"
+    ```
+
+然后，只需要在向下经过节点时下传标记即可．模板题要求的操作比较简单，只有按照排名寻找的操作（即 `loc`）涉及向下访问节点．注意，需要在函数每次访问一个新的节点 **前** 下传标记．
+
+???+ example "参考实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-2.cpp:push-down-lazy"
+    ```
+
+因为向下访问节点时已经移除了经过的路径的所有懒标记，所以利用伸展操作上移节点时不再需要处理懒标记．但是，对于区间操作的那一个节点要谨慎处理：因为它同样位于伸展操作的路径上，但是刚刚操作完，可能存在尚未下传的标记，需要首先下传再做伸展操作，正如同上文所做的那样．
+
+### 参考实现
+
+本节的最后，给出模板题目 [文艺平衡树](https://loj.ac/problem/105) 的参考实现．
+
+??? example "参考实现"
+    ```cpp
+    --8<-- "docs/ds/code/splay/splay-2.cpp:full-text"
+    ```
+
+## 习题
+
+这些题目都是裸的 Splay 树维护二叉查找树：
+
+-   [【模板】普通平衡树](https://loj.ac/problem/104)
+-   [【模板】文艺平衡树](https://loj.ac/problem/105)
+-   [「HNOI2002」营业额统计](https://loj.ac/problem/10143)
+-   [「HNOI2004」宠物收养所](https://loj.ac/problem/10144)
+
+Splay 树还出现在更复杂的应用场景中：
+
+-   [「Cerc2007」robotic sort 机械排序](https://www.luogu.com.cn/problem/P4402)
+-   [「HNOI2011」括号修复/「JSOI2011」括号序列](https://www.luogu.com.cn/problem/P3215)
+-   [二逼平衡树（树套树）](https://loj.ac/problem/106)
+-   [BZOJ 2827 千山鸟飞绝](https://hydro.ac/p/bzoj-P2827)
+-   [「Lydsy1706 月赛」K 小值查询](https://hydro.ac/p/bzoj-P4923)
+-   [POJ3580 SuperMemo](http://poj.org/problem?id=3580)
+
+## 参考资料与注释
+
+本文部分内容引用自 algocode 算法博客，特别鸣谢！
+
+[^degen]: Splay 树只保证均摊复杂度为 $O(\log n)$．它不维护 AVL 树或红黑树那样的平衡条件，甚至可能在一系列操作后退化为链．因此，单次操作的最坏复杂度为 $O(n)$．

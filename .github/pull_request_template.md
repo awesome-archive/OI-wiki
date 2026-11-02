@@ -1,13 +1,11 @@
-首先，十分感谢你花时间来给 OI Wiki 开一个 Pull Request，下面是一些你可能需要知道的信息：
+- [ ] 我已认真阅读贡献指南 (contributing guidelines) 和社区公约 (code of conduct)，并遵循了如何参与页及格式手册页的相应规范。
 
-- 请在 commit 的时候写比较有意义的 commit message
-- 请给 PR 起比较有意义的标题。
-- 请在 PR 之前检查一下您的 PR 是否存在以下常见问题：（确认无问题后请将选项打钩 / 填为 `[x]`）
-   * [ ] 您的 MD 代码的书写格式，包括但不限于 **中文与英文之间、中文与阿拉伯数字、中文与 LaTeX 公式之间要有一个半角空格**，特别地，在中文全角符号与英文、阿拉伯数字、LaTeX 公式之间，**不需要**半角空格。（这个可以使用自动化工具辅助，比如 https://github.com/baurine/vscode-pangu)
-   * [ ] 对于 LaTeX 公式，请注意常见的问题，**一定要使用** `$\log$`、`$\min$`、`$\max$`、`$\gcd$` 等，而非 `$log$`、`$min$`、`$max$`、`$gcd$`。对于最小公倍数，请使用 `$\operatorname{lcm}$` 而非 `$lcm$`，省略号请使用 `$\cdots$`，叉乘请使用 `$\times$`，点乘请使用 `$\cdot$`。
-   * [ ] 所有公式中的希腊字母等特殊符号，请不要使用输入法的插入特殊符号功能，而应该使用对应的 LaTeX 公式符号。如 phi 大多数情况下应该使用 `$\varphi$` 而不是 `$\phi$`。
-   * [ ] 行间公式前后各要有一行空行。
-   * [ ] 对于目录中存在公式的情况，请使用 HTML 代码而非直接插入公式以避免双倍公式的问题，请参考[避免 ToC 中双倍公式的写法](https://oi-wiki.org/intro/faq/#_13))。
-   * [ ] NOI 系列赛英文名称请使用全大写，如 NOIP，其他比赛请与官方英文名称保持一致。
-
-关于文档内容的基本格式和更多内容规范，可以查阅 [F.A.Q](https://oi-wiki.org/intro/faq/#_4)。
+<!--
+这是 Pull Request 的描述页面，可拖动输入框右下角调节大小。尽管按下绿色按钮提交后，您仍可以对描述进行修改，但还请您先阅读以下注意事项。
+- 请不要删去本区域文字，或在此修改内容，因为本区域作为注释内容是不可见的。你应该点击 Preview 查看描述页效果。
+- 请勾选输入框外的 `Allow edits from maintainers` 的候选框（机器人需要修正格式），并通过蓝色高亮链接阅读、理解了指南和公约后，将上述 [ ] 替换为 [x]。
+- 若本 Pull Request 能够完全解决某个 Issue，请将该 Pull Request 与对应的 Issue 链接起来，具体做法请参见 <https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue>。
+- 请对照规范页面，检查 Commit 信息、PR 标题和下方 Compare 页面，例如：
+  - 标题应类似于 `feat(lang/lambda.md): 增加使用对象描述` 。
+  - 您的修改是否波及到了其他文件，是否发生了意图之外的文件名修改（这在您启用了翻译软件的情况下较为常见），是否引入了无关文件。
+-->
